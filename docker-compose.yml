@@ -1,0 +1,41 @@
+# Config for development
+services:
+  _django-image_build:
+    image: django-dev-image
+    build:
+      context: ./src/backend
+    command: ['echo', 'build completed']  # any linux command which directly terminates.
+
+  django:
+    image: django-dev-image
+    extends:
+      file: common-services.yml
+      service: django
+    command: sleep infinity
+#    command: gunicorn wsgi:application --bind 0.0.0.0:8000
+    depends_on:
+      - postgres
+      - _django-image_build
+      - rabbitmq
+    ports:
+      - ${DJANGO_HTTP_PORT:-8000}:8000
+
+  postgres:
+    extends:
+      file: common-services.yml
+      service: postgres
+    ports:
+      - 127.0.0.1:${POSTGRES_PORT:-5432}:5432
+    restart: unless-stopped
+
+  rabbitmq:
+    extends:
+      file: common-services.yml
+      service: rabbitmq
+    restart: unless-stopped
+    ports:
+      - 5672:5672
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

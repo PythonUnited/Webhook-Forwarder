@@ -1,0 +1,77 @@
+###########
+# BUILDER #
+###########
+
+# pull official base image
+FROM python:3.11.7-bookworm as builder
+
+# set work directory
+WORKDIR /usr/src/app
+
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV PIP_DEFAULT_TIMEOUT 60
+
+# install dependencies
+#RUN apt update \
+#    && apt install -y build-essential libssl-dev libffi-dev \
+#    python3-dev cargo
+
+RUN pip install --upgrade pip
+# COPY . .
+
+# # lint
+# RUN pip install flake8
+# RUN flake8 --ignore=E501,F401 .
+
+# install dependencies
+COPY ./requirements requirements
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /usr/src/app/wheels -r requirements/deployment.txt
+
+
+#########
+# FINAL #
+#########
+
+# pull official base image
+FROM python:3.11.7-bookworm
+
+# create directory for the app user
+RUN mkdir -p /home/app
+
+# create the app user
+ARG GID
+ARG UID
+RUN addgroup --gid ${GID} app && useradd -m --uid ${UID} --gid ${GID} app
+#RUN addgroup app && useradd -m -g app app
+
+# create the appropriate directories
+ENV HOME=/home/app
+RUN mkdir $HOME/staticfiles
+RUN mkdir $HOME/mediafiles
+ENV APP_HOME=/home/app/django
+RUN mkdir $APP_HOME
+WORKDIR $APP_HOME
+
+# install dependencies
+#RUN apt update && apt install -y python3-dev
+COPY --from=builder /usr/src/app/wheels /wheels
+COPY --from=builder /usr/src/app/requirements requirements
+RUN pip install --upgrade pip
+RUN pip install --no-cache /wheels/*
+
+# copy entrypoint-deployment.sh
+COPY ./entrypoint.deployment.sh $APP_HOME
+
+# copy project
+COPY . $APP_HOME
+
+# chown all the files to the app user
+RUN chown -R app:app $HOME
+
+# change to the app user
+USER app
+
+# run entrypoint.prod.sh
+ENTRYPOINT ["/home/app/django/entrypoint.deployment.sh"]

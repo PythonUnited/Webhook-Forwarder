@@ -1,0 +1,18 @@
+#--- Docker compose settings ---------------------------------------------------
+# As we are using rootless docker, default UID/GID to 0
+UID=0
+GID=0
+
+DJANGO_HTTP_PORT=8080
+
+#--- Enable below for local development ----------------
+# Using postgres container, but without django container
+DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5488/postgres
+POSTGRES_PORT=5488
+SECRET_KEY=supersecret
+DJANGO_DEBUG=True
+
+#--- Enable below for test or production ---------------------------------------
+
+# COMPOSE_FILE=docker-compose.deployment.yml
+COMPOSE_PROJECT_NAME=multipass-[dev|tst|acc|prd]

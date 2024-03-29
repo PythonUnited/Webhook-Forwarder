@@ -1,0 +1,3 @@
+-r common_frozen.txt
+sentry-sdk
+gunicorn

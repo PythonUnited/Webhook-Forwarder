@@ -1,0 +1,11 @@
+Django
+django-dramatiq
+django-environ
+django-extensions
+django-ninja
+dramatiq[rabbitmq, watch]
+git+https://github.com/Sovetnikov/django_periodiq
+pika
+psycopg2-binary
+Pygments
+requests

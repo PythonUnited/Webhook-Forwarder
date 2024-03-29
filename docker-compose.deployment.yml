@@ -1,0 +1,80 @@
+# Config for deployment (tst/acc/prd)
+services:
+  _django-image_build:
+    image: django-deployment-image
+    env_file:
+      - ./.env.django
+    user: '${UID}:${GID}'
+    build:
+      context: ./src/backend
+      dockerfile: Dockerfile.deployment
+      args:
+        - UID=${UID}
+        - GID=${GID}
+
+    command: [ 'echo', 'build completed' ] # any linux command which directly terminates.
+
+  django:
+    image: django-deployment-image
+    extends:
+      file: common-services.yml
+      service: django
+    command: gunicorn wsgi:application --bind 0.0.0.0:8000
+    restart: unless-stopped
+    depends_on:
+      - _django-image_build
+      - postgres
+      - rabbitmq
+    ports:
+      - ${DJANGO_HTTP_PORT:-8000}:8000
+    volumes:
+      - ./data/staticfiles:/home/app/staticfiles
+      - ./data/mediafiles:/home/app/mediafiles
+
+  django-dramatiq-worker:
+    image: django-deployment-image
+    extends:
+      file: common-services.yml
+      service: django-dramatiq-worker
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - _django-image_build
+      - rabbitmq
+
+  postgres:
+    extends:
+      file: common-services.yml
+      service: postgres
+    restart: unless-stopped
+
+  pg-backups:
+    extends:
+      file: common-services.yml
+      service: pg-backups
+    links:
+      - postgres
+    depends_on:
+      - postgres
+    environment:
+      POSTGRES_HOST: postgres
+      BACKUP_KEEP_DAYS: 7
+      BACKUP_KEEP_WEEKS: 2
+      BACKUP_KEEP_MONTHS: 1
+
+  rabbitmq:
+    hostname: rabbitmq
+    extends:
+      file: common-services.yml
+      service: rabbitmq
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+
+
+volumes:
+  postgres_data:
+  rabbitmq_data:

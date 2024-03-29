@@ -1,0 +1,73 @@
+version: '3.7'
+
+services:
+
+  django:
+    env_file:
+      - ./.env.django
+    user: '${UID}:${GID}'
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./src/backend/:/home/app/django/
+      - ./logs:/home/app/logs
+      - .:/srv/project_root/
+
+  django-dramatiq-worker:
+    env_file:
+      - ./.env.django
+    user: '${UID}:${GID}'
+    volumes:
+      - ./src/backend/:/home/app/django/
+      - ./logs:/home/app/logs
+    command: python manage.py rundramatiq --processes 2  --threads 1
+
+  django-periodiq-worker:
+    env_file:
+      - ./.env.django
+    user: '${UID}:${GID}'
+    volumes:
+      - ./src/backend/:/home/app/django/
+      - ./logs:/home/app/logs
+    command: python manage.py runperiodiq
+
+  postgres:
+    image: postgres:16-alpine
+    env_file:
+      - ./.env.django.db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  pg-backups:
+    image: prodrigestivill/postgres-backup-local
+    env_file:
+      - ./.env.django.db
+    restart: always
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', 'http://localhost:8080/']
+      interval: 10s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./pgbackups:/backups
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_EXTRA_OPTS: -Z6 --schema=public --blobs
+      BACKUP_KEEP_MONTHS: 2
+
+  rabbitmq:
+    image: rabbitmq:3.11
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+    volumes:
+      - rabbitmq_data:/data
+
+#  nginx:
+#    image: nginx:1.23.0
+#    volumes:
+#      - ./nginx-templates:/etc/nginx/templates
+#    environment:
+#      - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
