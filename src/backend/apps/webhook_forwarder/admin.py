@@ -5,7 +5,7 @@ from django.utils.html import format_html
 
 from lib.utils import get_admin_link, prettify_json
 from .models import WebhookIdentifier, WebhookForwardURL, WebhookPayload
-
+from .tasks import forward_payload
 
 class InlineWebhookForwardURL(admin.TabularInline):
     model = WebhookForwardURL
@@ -69,6 +69,7 @@ class WebhookPayloadLAdmin(admin.ModelAdmin):
         "get_http_payload",
     ]
     exclude = ["outgoing_requests"]
+    actions = ["resend_payload"]
 
     @staticmethod
     @admin.display(
@@ -107,3 +108,11 @@ class WebhookPayloadLAdmin(admin.ModelAdmin):
             return None
 
         return prettify_json(payload)
+
+    @staticmethod
+    @admin.action(description="Resend payload")
+    def resend_payload(self, request, queryset):
+        for obj in queryset:
+
+            for forward_url in obj.origin.forward_urls.active():
+                forward_payload.send(obj.id, forward_url.id)
